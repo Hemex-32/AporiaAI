@@ -19,6 +19,9 @@ interface HealthResponse {
   status?: string;
   resources_ready?: boolean;
   resources_error?: string | null;
+  warmup_elapsed_seconds?: number;
+  warmup_estimate_seconds?: number;
+  warmup_remaining_seconds?: number;
 }
 
 const getApiBaseUrl = () => {
@@ -52,6 +55,17 @@ const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeoutM
   }
 };
 
+const formatDuration = (seconds: number) => {
+  if (seconds <= 0) return 'less than 10 seconds';
+  if (seconds < 60) return `${seconds} seconds`;
+
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  if (remainingSeconds === 0) return `${minutes} min`;
+
+  return `${minutes} min ${remainingSeconds} sec`;
+};
+
 export default function App() {
   const API_BASE_URL = getApiBaseUrl();
 
@@ -62,6 +76,7 @@ export default function App() {
   const [uploadedFile, setUploadedFile] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+  const [warmupSecondsRemaining, setWarmupSecondsRemaining] = useState<number | null>(null);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -73,12 +88,24 @@ export default function App() {
     scrollToBottom();
   }, [messages, isGenerating]);
 
+  useEffect(() => {
+    if (warmupSecondsRemaining === null) return;
+    if (warmupSecondsRemaining <= 0) return;
+
+    const timerId = window.setTimeout(() => {
+      setWarmupSecondsRemaining(prev => prev === null ? null : Math.max(0, prev - 1));
+    }, 1000);
+
+    return () => window.clearTimeout(timerId);
+  }, [warmupSecondsRemaining]);
+
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0) return;
     const file = acceptedFiles[0];
     
     setIsUploading(true);
     setUploadError(null);
+    setWarmupSecondsRemaining(null);
     setUploadStatus('Checking backend readiness...');
     const formData = new FormData();
     formData.append('file', file);
@@ -99,9 +126,12 @@ export default function App() {
       }
 
       if (!health.resources_ready) {
-        throw new Error('Backend is still warming up on Render. Wait about a minute, then upload the PDF again.');
+        const remainingSeconds = health.warmup_remaining_seconds ?? 60;
+        setWarmupSecondsRemaining(remainingSeconds);
+        throw new Error(`Backend is warming up. Estimated time remaining: ${formatDuration(remainingSeconds)}.`);
       }
 
+      setWarmupSecondsRemaining(null);
       setUploadStatus('Uploading and embedding PDF...');
       const response = await fetchWithTimeout(`${API_BASE_URL}/upload`, {
         method: 'POST',
@@ -329,7 +359,9 @@ export default function App() {
                     {isUploading ? 'Ingesting manuscript...' : 'Drop PDF here'}
                   </p>
                   <p className={`text-[9px] mt-1 tracking-wider ${theme === 'dark' ? 'text-slate-500' : 'text-slate-450'}`}>
-                    {uploadStatus || 'Or select file from explorer'}
+                    {warmupSecondsRemaining !== null
+                      ? `Warmup estimate: ${formatDuration(warmupSecondsRemaining)} remaining`
+                      : uploadStatus || 'Or select file from explorer'}
                   </p>
                 </div>
               </div>

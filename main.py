@@ -1,6 +1,7 @@
 import asyncio
 from contextlib import asynccontextmanager
 import json
+import time
 import uuid
 from typing import List, Optional
 
@@ -20,10 +21,13 @@ collection = None
 gemini_client = None
 resources_ready = asyncio.Event()
 resources_error = None
+resources_started_at = time.time()
+resources_ready_at = None
+warmup_estimate_seconds = 90
 
 
 def load_resources_sync():
-    global chroma_client, collection, gemini_client, resources_error
+    global chroma_client, collection, gemini_client, resources_error, resources_ready_at
 
     print("Background: loading embedding model and vector store...")
     try:
@@ -38,6 +42,7 @@ def load_resources_sync():
             name="research_papers",
             embedding_function=embedding_function,
         )
+        resources_ready_at = time.time()
         print("Background: all resources ready.")
     except Exception as exc:
         resources_error = exc
@@ -171,10 +176,21 @@ async def root():
 
 @app.get("/health")
 async def health_check():
+    now = time.time()
+    elapsed_seconds = max(0, round(now - resources_started_at))
+    remaining_seconds = 0 if resources_ready.is_set() else max(
+        0,
+        warmup_estimate_seconds - elapsed_seconds,
+    )
+
     return {
         "status": "healthy" if resources_ready.is_set() and not resources_error else "warming",
         "resources_ready": resources_ready.is_set(),
         "resources_error": str(resources_error) if resources_error else None,
+        "warmup_elapsed_seconds": elapsed_seconds,
+        "warmup_estimate_seconds": warmup_estimate_seconds,
+        "warmup_remaining_seconds": remaining_seconds,
+        "resources_ready_at": resources_ready_at,
     }
 
 
