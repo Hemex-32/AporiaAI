@@ -1,0 +1,102 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply min-h-screen antialiased selection:bg-brand-500/20 overflow-hidden font-sans transition-colors duration-500;
+  }
+}
+
+@layer utilities {
+  /* Extremely soft, frameless glass sheets */
+  .glass-panel-dark {
+    @apply bg-dark-900/60 backdrop-blur-3xl border border-white/[0.04] shadow-[0_24px_50px_-12px_rgba(0,0,0,0.7)];
+  }
+
+  .glass-panel-light {
+    @apply bg-white/70 backdrop-blur-3xl border border-black/[0.03] shadow-[0_24px_50px_-12px_rgba(0,0,0,0.03)];
+  }
+  
+  .glass-card-dark {
+    @apply bg-white/[0.01] backdrop-blur-2xl border border-white/[0.05] shadow-[0_12px_30px_-10px_rgba(0,0,0,0.5)];
+  }
+
+  .glass-card-light {
+    @apply bg-black/[0.005] backdrop-blur-2xl border border-black/[0.03] shadow-[0_12px_30px_-10px_rgba(0,0,0,0.02)];
+  }
+
+  .text-glow {
+    text-shadow: 0 0 30px rgba(226, 201, 153, 0.3);
+  }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-brand-500/10 rounded-full hover:bg-brand-500/30 transition-colors;
+  }
+}
+
+/* Warm Champagne & Sand ambient light source behind panels */
+.bg-luxury-mesh-dark {
+  background-color: #070708;
+  background-image: 
+    radial-gradient(circle at 10% 20%, rgba(226, 201, 153, 0.05), transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(226, 201, 153, 0.04), transparent 45%),
+    radial-gradient(circle at 50% 50%, rgba(20, 20, 23, 0.5), #070708 100%);
+}
+
+.bg-luxury-mesh-light {
+  background-color: #FAFBF9;
+  background-image: 
+    radial-gradient(circle at 10% 20%, rgba(226, 201, 153, 0.35), transparent 45%),
+    radial-gradient(circle at 90% 80%, rgba(226, 201, 153, 0.25), transparent 45%),
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.9), #FAFBF9 100%);
+}
+
+/* Ambient glow nodes */
+.ambient-glow-orb {
+  position: absolute;
+  width: 450px;
+  height: 450px;
+  background: radial-gradient(circle, rgba(226, 201, 153, 0.04) 0%, transparent 70%);
+  filter: blur(50px);
+  pointer-events: none;
+  z-index: 0;
+  transition: opacity 0.5s ease;
+}
+
+.ambient-glow-orb-light {
+  background: radial-gradient(circle, rgba(226, 201, 153, 0.4) 0%, transparent 70%);
+}
+
+/* Elegant champagne-striped luxury accent bar */
+.luxury-accent-line {
+  height: 4px;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(226, 201, 153, 0.3),
+    rgba(226, 201, 153, 0.3) 12px,
+    rgba(226, 201, 153, 0.05) 12px,
+    rgba(226, 201, 153, 0.05) 24px
+  );
+  border-radius: 9999px 9999px 0 0;
+  width: 100%;
+}
+
+/* Hide scrollbars cleanly */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+
