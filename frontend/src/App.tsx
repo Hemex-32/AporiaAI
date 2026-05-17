@@ -15,6 +15,12 @@ interface ApiErrorBody {
   detail?: string;
 }
 
+interface HealthResponse {
+  status?: string;
+  resources_ready?: boolean;
+  resources_error?: string | null;
+}
+
 const getApiBaseUrl = () => {
   const configuredUrl = import.meta.env.VITE_API_BASE_URL?.trim();
   if (configuredUrl) return configuredUrl.replace(/\/+$/, '');
@@ -32,6 +38,20 @@ const getResponseErrorMessage = async (response: Response) => {
   return response.statusText || `Request failed with status ${response.status}`;
 };
 
+const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeoutMs = 30000) => {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+};
+
 export default function App() {
   const API_BASE_URL = getApiBaseUrl();
 
@@ -41,6 +61,7 @@ export default function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -58,21 +79,34 @@ export default function App() {
     
     setIsUploading(true);
     setUploadError(null);
+    setUploadStatus('Checking backend readiness...');
     const formData = new FormData();
     formData.append('file', file);
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), 180000);
 
     try {
       if (!API_BASE_URL) {
         throw new Error('Missing VITE_API_BASE_URL. Set it in Vercel to your Render backend URL and redeploy.');
       }
 
-      const response = await fetch(`${API_BASE_URL}/upload`, {
+      const healthResponse = await fetchWithTimeout(`${API_BASE_URL}/health`, {}, 15000);
+      if (!healthResponse.ok) {
+        throw new Error(await getResponseErrorMessage(healthResponse));
+      }
+
+      const health = await healthResponse.json() as HealthResponse;
+      if (health.resources_error) {
+        throw new Error(`Backend startup failed: ${health.resources_error}`);
+      }
+
+      if (!health.resources_ready) {
+        throw new Error('Backend is still warming up on Render. Wait about a minute, then upload the PDF again.');
+      }
+
+      setUploadStatus('Uploading and embedding PDF...');
+      const response = await fetchWithTimeout(`${API_BASE_URL}/upload`, {
         method: 'POST',
         body: formData,
-        signal: controller.signal,
-      });
+      }, 180000);
       
       if (!response.ok) {
         throw new Error(await getResponseErrorMessage(response));
@@ -89,13 +123,13 @@ export default function App() {
     } catch (error) {
       console.error('Error uploading file:', error);
       const message = error instanceof DOMException && error.name === 'AbortError'
-        ? 'Upload timed out while the backend was processing the PDF. Try a smaller PDF or retry after the Render service is warm.'
+        ? 'The backend did not respond in time. Make sure the Render service is awake, then try a smaller PDF or retry once it is warm.'
         : error instanceof Error
           ? error.message
           : 'Failed to upload file. Make sure the backend is running.';
       setUploadError(message);
     } finally {
-      window.clearTimeout(timeoutId);
+      setUploadStatus(null);
       setIsUploading(false);
     }
   }, [API_BASE_URL]);
@@ -295,7 +329,7 @@ export default function App() {
                     {isUploading ? 'Ingesting manuscript...' : 'Drop PDF here'}
                   </p>
                   <p className={`text-[9px] mt-1 tracking-wider ${theme === 'dark' ? 'text-slate-500' : 'text-slate-450'}`}>
-                    Or select file from explorer
+                    {uploadStatus || 'Or select file from explorer'}
                   </p>
                 </div>
               </div>

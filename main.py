@@ -54,11 +54,17 @@ async def load_resources_background():
     resources_ready.set()
 
 
-async def ensure_resources_ready(timeout_seconds: int = 120):
+async def ensure_resources_ready(wait_for_ready: bool = False, timeout_seconds: int = 120):
     if resources_error:
         raise HTTPException(
             status_code=503,
             detail=f"Backend resources failed to initialize: {resources_error}",
+        )
+
+    if not wait_for_ready and not resources_ready.is_set():
+        raise HTTPException(
+            status_code=503,
+            detail="Backend is still warming up. Please retry in a minute.",
         )
 
     try:
