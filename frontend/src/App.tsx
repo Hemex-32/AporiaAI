@@ -11,14 +11,36 @@ interface Message {
   sources?: any;
 }
 
+interface ApiErrorBody {
+  detail?: string;
+}
+
+const getApiBaseUrl = () => {
+  const configuredUrl = import.meta.env.VITE_API_BASE_URL?.trim();
+  if (configuredUrl) return configuredUrl.replace(/\/+$/, '');
+  return import.meta.env.PROD ? '' : 'http://localhost:8000';
+};
+
+const getResponseErrorMessage = async (response: Response) => {
+  try {
+    const body = await response.json() as ApiErrorBody;
+    if (body.detail) return body.detail;
+  } catch {
+    // Fall back to status text below when the backend did not return JSON.
+  }
+
+  return response.statusText || `Request failed with status ${response.status}`;
+};
+
 export default function App() {
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+  const API_BASE_URL = getApiBaseUrl();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -35,17 +57,29 @@ export default function App() {
     const file = acceptedFiles[0];
     
     setIsUploading(true);
+    setUploadError(null);
     const formData = new FormData();
     formData.append('file', file);
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 180000);
 
     try {
+      if (!API_BASE_URL) {
+        throw new Error('Missing VITE_API_BASE_URL. Set it in Vercel to your Render backend URL and redeploy.');
+      }
+
       const response = await fetch(`${API_BASE_URL}/upload`, {
         method: 'POST',
         body: formData,
+        signal: controller.signal,
       });
       
-      if (!response.ok) throw new Error('Upload failed');
-      setUploadedFile(file.name);
+      if (!response.ok) {
+        throw new Error(await getResponseErrorMessage(response));
+      }
+
+      const uploadResult = await response.json();
+      setUploadedFile(uploadResult.document_id || file.name);
       
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
@@ -54,11 +88,17 @@ export default function App() {
       }]);
     } catch (error) {
       console.error('Error uploading file:', error);
-      alert('Failed to upload file. Make sure the backend is running.');
+      const message = error instanceof DOMException && error.name === 'AbortError'
+        ? 'Upload timed out while the backend was processing the PDF. Try a smaller PDF or retry after the Render service is warm.'
+        : error instanceof Error
+          ? error.message
+          : 'Failed to upload file. Make sure the backend is running.';
+      setUploadError(message);
     } finally {
+      window.clearTimeout(timeoutId);
       setIsUploading(false);
     }
-  }, []);
+  }, [API_BASE_URL]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -260,6 +300,21 @@ export default function App() {
                 </div>
               </div>
             </div>
+
+            <AnimatePresence>
+              {uploadError && (
+                <motion.p
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  className={`mt-3 text-[10px] leading-relaxed ${
+                    theme === 'dark' ? 'text-red-300' : 'text-red-600'
+                  }`}
+                >
+                  {uploadError}
+                </motion.p>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Active File indicator */}

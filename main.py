@@ -1,54 +1,134 @@
 import asyncio
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
-import chromadb
-from chromadb.utils import embedding_functions
-from pypdf import PdfReader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-import os
 import json
-from google import genai
-from pydantic import BaseModel
+import uuid
 from typing import List, Optional
 
-# Global references — populated during lifespan startup
+import chromadb
+from chromadb.utils import embedding_functions
+from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+from google import genai
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from pydantic import BaseModel
+from pypdf import PdfReader
+
+
 chroma_client = None
 collection = None
 gemini_client = None
+resources_ready = asyncio.Event()
+resources_error = None
 
 
 def load_resources_sync():
-    global chroma_client, collection, gemini_client
-    print("🚀 Background: loading embedding model and vector store...")
-    chroma_client = chromadb.PersistentClient(
-        path="./chroma_db",
-        settings=chromadb.Settings(anonymized_telemetry=False)
+    global chroma_client, collection, gemini_client, resources_error
+
+    print("Background: loading embedding model and vector store...")
+    try:
+        chroma_client = chromadb.PersistentClient(
+            path="./chroma_db",
+            settings=chromadb.Settings(anonymized_telemetry=False),
+        )
+        embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
+            model_name="all-MiniLM-L6-v2"
+        )
+        collection = chroma_client.get_or_create_collection(
+            name="research_papers",
+            embedding_function=embedding_function,
+        )
+        print("Background: all resources ready.")
+    except Exception as exc:
+        resources_error = exc
+        print(f"Background: resource loading failed: {exc}")
+
+    try:
+        gemini_client = genai.Client()
+    except Exception as exc:
+        print(f"Background: Gemini client unavailable: {exc}")
+
+
+async def load_resources_background():
+    await asyncio.to_thread(load_resources_sync)
+    resources_ready.set()
+
+
+async def ensure_resources_ready(timeout_seconds: int = 120):
+    if resources_error:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Backend resources failed to initialize: {resources_error}",
+        )
+
+    try:
+        await asyncio.wait_for(resources_ready.wait(), timeout=timeout_seconds)
+    except asyncio.TimeoutError:
+        raise HTTPException(
+            status_code=503,
+            detail="Backend is still warming up. Please retry in a minute.",
+        )
+
+    if resources_error:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Backend resources failed to initialize: {resources_error}",
+        )
+
+
+def process_pdf_sync(file: UploadFile):
+    pdf_reader = PdfReader(file.file)
+    text = ""
+
+    for page in pdf_reader.pages:
+        extracted = page.extract_text()
+        if extracted:
+            text += extracted + "\n"
+
+    if not text.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Could not extract any text from the PDF.",
+        )
+
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,
+        chunk_overlap=200,
+        length_function=len,
     )
-    embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
-        model_name="all-MiniLM-L6-v2"
+    chunks = text_splitter.split_text(text)
+
+    document_id = f"{file.filename}-{uuid.uuid4().hex}"
+    ids = [f"{document_id}_chunk_{i}" for i in range(len(chunks))]
+    metadatas = [
+        {"source": file.filename, "document_id": document_id, "chunk_index": i}
+        for i in range(len(chunks))
+    ]
+
+    collection.add(
+        documents=chunks,
+        metadatas=metadatas,
+        ids=ids,
     )
-    collection = chroma_client.get_or_create_collection(
-        name="research_papers",
-        embedding_function=embedding_function
-    )
-    gemini_client = genai.Client()
-    print("✅ Background: all resources ready.")
+
+    return {
+        "status": "success",
+        "document_id": file.filename,
+        "message": f"Successfully processed and stored {len(chunks)} chunks from {file.filename}.",
+    }
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
     Start heavy resource initialization in a background thread so that
-    we immediately yield and uvicorn binds the port BEFORE downloading finishes.
-    This completely prevents Render port scan timeouts.
+    uvicorn can bind the port before model loading finishes on Render.
     """
-    asyncio.create_task(asyncio.to_thread(load_resources_sync))
-    
-    yield  # Uvicorn binds the port IMMEDIATELY here
+    asyncio.create_task(load_resources_background())
 
-    print("🛑 Aporia: shutting down.")
+    yield
+
+    print("Aporia: shutting down.")
 
 
 app = FastAPI(
@@ -85,52 +165,27 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    return {
+        "status": "healthy" if resources_ready.is_set() and not resources_error else "warming",
+        "resources_ready": resources_ready.is_set(),
+        "resources_error": str(resources_error) if resources_error else None,
+    }
 
 
 @app.post("/upload")
 async def upload_pdf(file: UploadFile = File(...)):
     """
-    Endpoint to handle PDF parsing and chunking.
-    Extracts text, splits it into chunks, and stores in ChromaDB.
+    Extract text from a PDF, split it into chunks, and store it in ChromaDB.
     """
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="File must be a PDF")
 
+    await ensure_resources_ready()
+
     try:
-        # 1. Read PDF
-        pdf_reader = PdfReader(file.file)
-        text = ""
-        for page in pdf_reader.pages:
-            extracted = page.extract_text()
-            if extracted:
-                text += extracted + "\n"
-
-        if not text.strip():
-            raise HTTPException(status_code=400, detail="Could not extract any text from the PDF.")
-
-        # 2. Chunk text using RecursiveCharacterTextSplitter
-        text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=200,
-            length_function=len,
-        )
-        chunks = text_splitter.split_text(text)
-
-        # 3. Store in ChromaDB
-        ids = [f"{file.filename}_chunk_{i}" for i in range(len(chunks))]
-        metadatas = [{"source": file.filename, "chunk_index": i} for i in range(len(chunks))]
-
-        collection.add(
-            documents=chunks,
-            metadatas=metadatas,
-            ids=ids
-        )
-
-        return {
-            "status": "success",
-            "message": f"Successfully processed and stored {len(chunks)} chunks from {file.filename}."
-        }
+        return await asyncio.to_thread(process_pdf_sync, file)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing upload: {str(e)}")
 
@@ -138,29 +193,35 @@ async def upload_pdf(file: UploadFile = File(...)):
 @app.post("/chat")
 async def chat(payload: ChatRequest):
     """
-    Endpoint to perform scoped similarity search and generate streaming grounded answers via Gemini.
+    Perform scoped similarity search and generate streaming grounded answers via Gemini.
     """
+    await ensure_resources_ready()
+
+    if not gemini_client:
+        raise HTTPException(
+            status_code=503,
+            detail="Gemini client is not configured. Set GEMINI_API_KEY on the backend.",
+        )
+
     try:
-        # 1. Retrieve relevant chunks from ChromaDB
         query_params = {
             "query_texts": [payload.query],
-            "n_results": 5
+            "n_results": 5,
         }
         if payload.document_id:
             query_params["where"] = {"source": payload.document_id}
 
         results = collection.query(**query_params)
 
-        if not results['documents'] or not results['documents'][0]:
+        if not results["documents"] or not results["documents"][0]:
             async def empty_generator():
                 yield f"data: {json.dumps({'type': 'content', 'text': 'I cannot find any relevant context in the uploaded document to answer this question.'})}\n\n"
                 yield "data: [DONE]\n\n"
+
             return StreamingResponse(empty_generator(), media_type="text/event-stream")
 
-        context_chunks = results['documents'][0]
-        sources = results['metadatas'][0]
-
-        # 2. Build prompt with context & history
+        context_chunks = results["documents"][0]
+        sources = results["metadatas"][0]
         context = "\n\n---\n\n".join(context_chunks)
 
         history_str = ""
@@ -180,7 +241,6 @@ Conversation History:
 Question: {payload.query}
 """
 
-        # 3. Stream the generation
         async def event_generator():
             try:
                 primary_source = sources[0] if sources else None
@@ -188,7 +248,7 @@ Question: {payload.query}
 
                 response = gemini_client.models.generate_content_stream(
                     model="gemini-2.0-flash",
-                    contents=prompt
+                    contents=prompt,
                 )
                 for chunk in response:
                     if chunk.text:
