@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,17 +19,9 @@ collection = None
 gemini_client = None
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """
-    Initialize all heavy resources (ChromaDB, embedding model, Gemini client)
-    AFTER uvicorn has already bound to the port. This prevents Render's port
-    scan from timing out while waiting for model downloads.
-    """
+def load_resources_sync():
     global chroma_client, collection, gemini_client
-
-    print("🚀 Aporia: loading embedding model and vector store...")
-
+    print("🚀 Background: loading embedding model and vector store...")
     chroma_client = chromadb.PersistentClient(
         path="./chroma_db",
         settings=chromadb.Settings(anonymized_telemetry=False)
@@ -40,11 +33,20 @@ async def lifespan(app: FastAPI):
         name="research_papers",
         embedding_function=embedding_function
     )
-
     gemini_client = genai.Client()
-    print("✅ Aporia: all resources ready.")
+    print("✅ Background: all resources ready.")
 
-    yield  # Server runs here
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Start heavy resource initialization in a background thread so that
+    we immediately yield and uvicorn binds the port BEFORE downloading finishes.
+    This completely prevents Render port scan timeouts.
+    """
+    asyncio.create_task(asyncio.to_thread(load_resources_sync))
+    
+    yield  # Uvicorn binds the port IMMEDIATELY here
 
     print("🛑 Aporia: shutting down.")
 
