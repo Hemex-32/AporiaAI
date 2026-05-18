@@ -1,16 +1,17 @@
 import asyncio
 from contextlib import asynccontextmanager
 import json
+import os
 import time
 import uuid
 from typing import List, Optional
 
 import chromadb
-from chromadb.utils import embedding_functions
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from google import genai
+from google.genai import types
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pydantic import BaseModel
 from pypdf import PdfReader
@@ -23,7 +24,33 @@ resources_ready = asyncio.Event()
 resources_error = None
 resources_started_at = time.time()
 resources_ready_at = None
-warmup_estimate_seconds = 90
+warmup_estimate_seconds = 15
+
+
+class GeminiEmbeddingFunction:
+    def __init__(self):
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY must be set to initialize embeddings.")
+
+        self.client = genai.Client(api_key=api_key)
+        self.model = "gemini-embedding-001"
+
+    @staticmethod
+    def name():
+        return "gemini-embedding-001"
+
+    def __call__(self, input):
+        texts = list(input)
+        if not texts:
+            return []
+
+        response = self.client.models.embed_content(
+            model=self.model,
+            contents=texts,
+            config=types.EmbedContentConfig(taskType="SEMANTIC_SIMILARITY"),
+        )
+        return [embedding.values for embedding in response.embeddings]
 
 
 def load_resources_sync():
@@ -35,11 +62,9 @@ def load_resources_sync():
             path="./chroma_db",
             settings=chromadb.Settings(anonymized_telemetry=False),
         )
-        embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name="all-MiniLM-L6-v2"
-        )
+        embedding_function = GeminiEmbeddingFunction()
         collection = chroma_client.get_or_create_collection(
-            name="research_papers",
+            name="research_papers_gemini",
             embedding_function=embedding_function,
         )
         resources_ready_at = time.time()
