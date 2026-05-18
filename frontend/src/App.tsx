@@ -66,6 +66,35 @@ const formatDuration = (seconds: number) => {
   return `${minutes} min ${remainingSeconds} sec`;
 };
 
+const getApiConfigError = (apiBaseUrl: string) => {
+  if (!apiBaseUrl) {
+    return 'Missing VITE_API_BASE_URL. Set it in Vercel to your Render backend URL and redeploy.';
+  }
+
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(apiBaseUrl);
+  } catch {
+    return `VITE_API_BASE_URL is not a valid URL: ${apiBaseUrl}`;
+  }
+
+  const hostname = parsedUrl.hostname.toLowerCase();
+  const isLocalBackend = hostname === 'localhost' || hostname === '127.0.0.1';
+  if (import.meta.env.PROD && isLocalBackend) {
+    return 'Vercel is pointing to localhost. Set VITE_API_BASE_URL to your public Render backend URL, then redeploy Vercel.';
+  }
+
+  if (window.location.protocol === 'https:' && parsedUrl.protocol === 'http:') {
+    return 'Your Vercel app is HTTPS but VITE_API_BASE_URL uses HTTP. Use the HTTPS Render URL instead.';
+  }
+
+  if (hostname.endsWith('vercel.app')) {
+    return 'VITE_API_BASE_URL appears to point to the frontend. It must point to the Render backend URL.';
+  }
+
+  return null;
+};
+
 export default function App() {
   const API_BASE_URL = getApiBaseUrl();
 
@@ -111,9 +140,8 @@ export default function App() {
     formData.append('file', file);
 
     try {
-      if (!API_BASE_URL) {
-        throw new Error('Missing VITE_API_BASE_URL. Set it in Vercel to your Render backend URL and redeploy.');
-      }
+      const configError = getApiConfigError(API_BASE_URL);
+      if (configError) throw new Error(configError);
 
       const healthResponse = await fetchWithTimeout(`${API_BASE_URL}/health`, {}, 15000);
       if (!healthResponse.ok) {
@@ -154,6 +182,8 @@ export default function App() {
       console.error('Error uploading file:', error);
       const message = error instanceof DOMException && error.name === 'AbortError'
         ? 'The backend did not respond in time. Make sure the Render service is awake, then try a smaller PDF or retry once it is warm.'
+        : error instanceof TypeError && error.message === 'Failed to fetch'
+          ? `Could not reach the backend at ${API_BASE_URL}. Check that VITE_API_BASE_URL is your HTTPS Render URL and that ${API_BASE_URL}/health opens in the browser.`
         : error instanceof Error
           ? error.message
           : 'Failed to upload file. Make sure the backend is running.';
