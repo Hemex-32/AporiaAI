@@ -119,57 +119,71 @@ def process_pdf_sync(file: UploadFile):
     pdf_reader = PdfReader(file.file)
     chunks_data = []
     
-    for i, page in enumerate(pdf_reader.pages):
-        print(f"Extracting text from page {i+1}...")
-        extracted = page.extract_text()
-        if extracted:
-            text_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=1000,
-                chunk_overlap=200,
-                length_function=len,
-            )
-            page_chunks = text_splitter.split_text(extracted)
-            for chunk in page_chunks:
-                chunks_data.append({
-                    "text": chunk,
-                    "metadata": {
-                        "source": file.filename or "unknown",
-                        "document_id": file.filename or "unknown",
-                        "page_number": i + 1
-                    }
-                })
+    # Initialize splitter once to save resources
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,
+        chunk_overlap=200,
+        length_function=len,
+    )
+    
+    source_name = file.filename or "unknown_document"
 
-    print(f"Extracted {len(chunks_data)} chunks.")
+    for i, page in enumerate(pdf_reader.pages):
+        extracted = page.extract_text()
+        if not extracted:
+            continue
+            
+        page_chunks = text_splitter.split_text(extracted)
+        for chunk in page_chunks:
+            if not chunk.strip():
+                continue
+            chunks_data.append({
+                "text": chunk,
+                "metadata": {
+                    "source": source_name,
+                    "document_id": source_name,
+                    "page_number": i + 1
+                }
+            })
+
     if not chunks_data:
+        print("Error: No text extracted from PDF.")
         raise HTTPException(
             status_code=400,
-            detail="Could not extract any text from the PDF.",
+            detail="Could not extract any text from the PDF. It might be scanned or empty.",
         )
 
-    document_id = f"{file.filename}-{uuid.uuid4().hex}"
-    ids = [f"{document_id}_chunk_{i}" for i in range(len(chunks_data))]
+    print(f"Generated {len(chunks_data)} chunks. Adding to vector store...")
+    
+    # Generate unique ID for this upload session
+    upload_id = uuid.uuid4().hex[:8]
+    ids = [f"{source_name}_{upload_id}_chunk_{i}" for i in range(len(chunks_data))]
     documents = [c["text"] for c in chunks_data]
     metadatas = [c["metadata"] for c in chunks_data]
 
-    print(f"Adding to ChromaDB...")
-    collection.add(
-        documents=documents,
-        metadatas=metadatas,
-        ids=ids,
-    )
-    print(f"Done.")
+    try:
+        collection.add(
+            documents=documents,
+            metadatas=metadatas,
+            ids=ids,
+        )
+    except Exception as e:
+        print(f"ChromaDB Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Database storage failed: {str(e)}")
 
-    # Simple suggested questions
+    print(f"Successfully processed {file.filename}")
+
+    # suggested questions
     suggested_questions = [
-        f"What are the main findings of {file.filename}?",
+        f"What are the main findings of {source_name}?",
         "Can you summarize the methodology used in this research?",
         "What are the key conclusions reached by the authors?"
     ]
 
     return {
         "status": "success",
-        "document_id": file.filename,
-        "message": f"Successfully processed and stored {len(chunks_data)} chunks from {file.filename}.",
+        "document_id": source_name,
+        "message": f"Successfully processed {len(chunks_data)} segments.",
         "suggested_questions": suggested_questions
     }
 
