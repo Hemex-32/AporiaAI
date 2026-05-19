@@ -1,8 +1,47 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, ReactNode } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useSpring, useMotionValue, useTransform } from 'framer-motion';
 import { UploadCloud, MessageSquare, FileText, Loader2, Bot, User, Sparkles, Sun, Moon, AudioLines } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+
+// --- Magnetic Component ---
+function Magnetic({ children, strength = 0.5 }: { children: ReactNode; strength?: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+
+  const springConfig = { damping: 15, stiffness: 150 };
+  const springX = useSpring(x, springConfig);
+  const springY = useSpring(y, springConfig);
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!ref.current) return;
+    const { clientX, clientY } = e;
+    const { left, top, width, height } = ref.current.getBoundingClientRect();
+    const centerX = left + width / 2;
+    const centerY = top + height / 2;
+    
+    // Calculate distance from center and multiply by strength
+    x.set((clientX - centerX) * strength);
+    y.set((clientY - centerY) * strength);
+  };
+
+  const handleMouseLeave = () => {
+    x.set(0);
+    y.set(0);
+  };
+
+  return (
+    <motion.div
+      ref={ref}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      style={{ x: springX, y: springY }}
+    >
+      {children}
+    </motion.div>
+  );
+}
 
 interface Message {
   id: string;
@@ -368,41 +407,43 @@ export default function App() {
               Datasources
             </h2>
             
-            <div 
-              {...getRootProps()} 
-              className={`
-                relative overflow-hidden cursor-pointer p-6 border transition-all duration-500 rounded-2xl
-                ${isDragActive 
-                  ? 'border-brand-400/50 bg-white/[0.02] shadow-[0_0_30px_rgba(226,201,153,0.05)]' 
-                  : theme === 'dark'
-                    ? 'border-white/10 bg-white/[0.005] hover:border-white/20 hover:bg-white/[0.01]'
-                    : 'border-black/10 bg-black/[0.005] hover:border-black/20 hover:bg-black/[0.01]'
-                }
-              `}
-            >
-              <input {...getInputProps()} />
-              <div className="flex flex-col items-center justify-center text-center gap-4 relative z-10">
-                <div className={`p-3 rounded-xl border transition-all ${
-                  isDragActive 
-                    ? 'border-brand-400/30 bg-brand-500/10 text-brand-300' 
+            <Magnetic strength={0.2}>
+              <div 
+                {...getRootProps()} 
+                className={`
+                  relative overflow-hidden cursor-pointer p-6 border transition-all duration-500 rounded-2xl
+                  ${isDragActive 
+                    ? 'border-brand-400/50 bg-white/[0.02] shadow-[0_0_30px_rgba(226,201,153,0.05)]' 
                     : theme === 'dark'
-                      ? 'border-white/[0.06] bg-white/[0.01] text-slate-400'
-                      : 'border-black/[0.06] bg-black/[0.01] text-slate-500'
-                }`}>
-                  {isUploading ? <Loader2 className="animate-spin text-brand-500" size={20} /> : <UploadCloud size={20} />}
-                </div>
-                <div>
-                  <p className={`text-sm font-light tracking-wide ${theme === 'dark' ? 'text-slate-200' : 'text-slate-700'}`}>
-                    {isUploading ? 'Ingesting manuscript...' : 'Drop PDF here'}
-                  </p>
-                  <p className={`text-[9px] mt-1 tracking-wider ${theme === 'dark' ? 'text-slate-500' : 'text-slate-450'}`}>
-                    {warmupSecondsRemaining !== null
-                      ? `Warmup estimate: ${formatDuration(warmupSecondsRemaining)} remaining`
-                      : uploadStatus || 'Or select file from explorer'}
-                  </p>
+                      ? 'border-white/10 bg-white/[0.005] hover:border-white/20 hover:bg-white/[0.01]'
+                      : 'border-black/10 bg-black/[0.005] hover:border-black/20 hover:bg-black/[0.01]'
+                  }
+                `}
+              >
+                <input {...getInputProps()} />
+                <div className="flex flex-col items-center justify-center text-center gap-4 relative z-10">
+                  <div className={`p-3 rounded-xl border transition-all ${
+                    isDragActive 
+                      ? 'border-brand-400/30 bg-brand-500/10 text-brand-300' 
+                      : theme === 'dark'
+                        ? 'border-white/[0.06] bg-white/[0.01] text-slate-400'
+                        : 'border-black/[0.06] bg-black/[0.01] text-slate-500'
+                  }`}>
+                    {isUploading ? <Loader2 className="animate-spin text-brand-500" size={20} /> : <UploadCloud size={20} />}
+                  </div>
+                  <div>
+                    <p className={`text-sm font-light tracking-wide ${theme === 'dark' ? 'text-slate-200' : 'text-slate-700'}`}>
+                      {isUploading ? 'Ingesting manuscript...' : 'Drop PDF here'}
+                    </p>
+                    <p className={`text-[9px] mt-1 tracking-wider ${theme === 'dark' ? 'text-slate-500' : 'text-slate-450'}`}>
+                      {warmupSecondsRemaining !== null
+                        ? `Warmup estimate: ${formatDuration(warmupSecondsRemaining)} remaining`
+                        : uploadStatus || 'Or select file from explorer'}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
+            </Magnetic>
 
             <AnimatePresence>
               {uploadError && (
@@ -683,17 +724,19 @@ export default function App() {
 
                 {/* Right Action Cluster */}
                 <div className="absolute right-3 flex items-center">
-                  <button
-                    type="submit"
-                    disabled={!input.trim() || !uploadedFile || isGenerating}
-                    className={`p-3.5 rounded-full transition-all shadow-lg ${
-                      theme === 'dark'
-                        ? 'bg-white text-dark-950 hover:bg-slate-200'
-                        : 'bg-dark-950 text-white hover:bg-slate-800'
-                    } disabled:opacity-30 disabled:scale-95`}
-                  >
-                    <AudioLines size={18} strokeWidth={2.5} />
-                  </button>
+                  <Magnetic strength={0.6}>
+                    <button
+                      type="submit"
+                      disabled={!input.trim() || !uploadedFile || isGenerating}
+                      className={`p-3.5 rounded-full transition-all shadow-lg ${
+                        theme === 'dark'
+                          ? 'bg-white text-dark-950 hover:bg-slate-200'
+                          : 'bg-dark-950 text-white hover:bg-slate-800'
+                      } disabled:opacity-30 disabled:scale-95`}
+                    >
+                      <AudioLines size={18} strokeWidth={2.5} />
+                    </button>
+                  </Magnetic>
                 </div>
               </form>
               <div className={`text-center mt-4 text-[9px] font-medium tracking-[0.25em] uppercase opacity-40 ${
