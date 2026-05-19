@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'framer-motion';
-import { UploadCloud, MessageSquare, Send, FileText, Loader2, Bot, User, Sparkles, Sun, Moon, Plus, Mic, AudioLines } from 'lucide-react';
+import { UploadCloud, MessageSquare, FileText, Loader2, Bot, User, Sparkles, Sun, Moon, Plus, Mic, AudioLines } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 interface Message {
