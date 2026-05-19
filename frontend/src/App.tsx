@@ -578,7 +578,7 @@ export default function App() {
                     </div>
                     
                     <div className={`
-                      max-w-[78%] px-6 py-4.5 rounded-2xl border relative
+                      max-w-[78%] px-6 py-4.5 rounded-2xl border relative text-center
                       ${msg.role === 'user' 
                         ? theme === 'dark'
                           ? 'bg-brand-500/[0.02] border-brand-500/10 text-slate-200' 
@@ -589,31 +589,31 @@ export default function App() {
                       }
                     `}>
                       {msg.role === 'user' ? (
-                        <p className={`whitespace-pre-wrap leading-relaxed text-sm tracking-wide font-light ${
+                        <p className={`whitespace-pre-wrap leading-relaxed text-sm tracking-wide font-light text-center ${
                           theme === 'dark' ? 'text-slate-300' : 'text-slate-700'
                         }`}>{msg.content}</p>
                       ) : (
-                        <div className={`font-sans text-[14px] font-light leading-relaxed max-w-none ${
+                        <div className={`font-sans text-[14px] font-light leading-relaxed max-w-none text-center ${
                           theme === 'dark' ? 'text-slate-300' : 'text-slate-700'
                         }`}>
                           <ReactMarkdown 
                             components={{
-                              p: ({node, ...props}) => <p className="mb-4 last:mb-0" {...props} />,
+                              p: ({node, ...props}) => <p className="mb-4 last:mb-0 text-center" {...props} />,
                               strong: ({node, ...props}) => <strong className={`${theme === 'dark' ? 'text-brand-300' : 'text-brand-700'} font-medium`} {...props} />,
-                              ul: ({node, ...props}) => <ul className={`list-disc pl-5 mb-4 space-y-1.5 text-sm tracking-wide font-light ${
+                              ul: ({node, ...props}) => <ul className={`list-disc pl-5 mb-4 space-y-1.5 text-sm tracking-wide font-light flex flex-col items-center ${
                                 theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
                               }`} {...props} />,
-                              ol: ({node, ...props}) => <ol className={`list-decimal pl-5 mb-4 space-y-1.5 text-sm tracking-wide font-light ${
+                              ol: ({node, ...props}) => <ol className={`list-decimal pl-5 mb-4 space-y-1.5 text-sm tracking-wide font-light flex flex-col items-center ${
                                 theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
                               }`} {...props} />,
-                              li: ({node, ...props}) => <li {...props} />,
-                              h1: ({node, ...props}) => <h1 className={`text-sm font-semibold mb-2 mt-4 first:mt-0 tracking-[0.1em] uppercase border-b pb-1.5 ${
+                              li: ({node, ...props}) => <li className="text-center" {...props} />,
+                              h1: ({node, ...props}) => <h1 className={`text-sm font-semibold mb-2 mt-4 first:mt-0 tracking-[0.1em] uppercase border-b pb-1.5 text-center ${
                                 theme === 'dark' ? 'text-white border-white/[0.04]' : 'text-slate-900 border-black/[0.03]'
                               }`} {...props} />,
-                              h2: ({node, ...props}) => <h2 className={`text-[11px] font-semibold mb-2 mt-3.5 first:mt-0 tracking-[0.08em] uppercase ${
+                              h2: ({node, ...props}) => <h2 className={`text-[11px] font-semibold mb-2 mt-3.5 first:mt-0 tracking-[0.08em] uppercase text-center ${
                                 theme === 'dark' ? 'text-white' : 'text-slate-900'
                               }`} {...props} />,
-                              h3: ({node, ...props}) => <h3 className={`text-[10px] font-semibold mb-1.5 mt-2.5 first:mt-0 tracking-[0.05em] uppercase ${
+                              h3: ({node, ...props}) => <h3 className={`text-[10px] font-semibold mb-1.5 mt-2.5 first:mt-0 tracking-[0.05em] uppercase text-center ${
                                 theme === 'dark' ? 'text-white' : 'text-slate-900'
                               }`} {...props} />,
                             }}
@@ -624,7 +624,7 @@ export default function App() {
                       )}
                       
                       {msg.sources && (
-                        <div className={`mt-5 pt-3.5 border-t flex items-center gap-2 text-[9px] font-medium tracking-wider ${
+                        <div className={`mt-5 pt-3.5 border-t flex items-center justify-center gap-2 text-[9px] font-medium tracking-wider ${
                           theme === 'dark' ? 'border-white/[0.03] text-slate-500' : 'border-black/[0.03] text-slate-450'
                         }`}>
                           <FileText size={10} className="text-brand-400" />
@@ -717,7 +717,7 @@ export default function App() {
                   onChange={(e) => setInput(e.target.value)}
                   placeholder="Ask anything"
                   disabled={!uploadedFile || isGenerating}
-                  className={`w-full bg-transparent border-none rounded-full py-6 pl-8 pr-16 text-base outline-none font-sans disabled:opacity-50 disabled:cursor-not-allowed ${
+                  className={`w-full bg-transparent border-none rounded-full py-6 px-16 text-base outline-none font-sans text-center disabled:opacity-50 disabled:cursor-not-allowed ${
                     theme === 'dark' ? 'text-slate-200 placeholder:text-slate-600' : 'text-slate-800 placeholder:text-slate-400'
                   }`}
                 />
