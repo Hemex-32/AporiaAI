@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'framer-motion';
-import { UploadCloud, MessageSquare, FileText, Loader2, Bot, User, Sparkles, Sun, Moon, Plus, Mic, AudioLines } from 'lucide-react';
+import { UploadCloud, MessageSquare, FileText, Loader2, Bot, User, Sparkles, Sun, Moon, AudioLines } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 interface Message {
@@ -638,28 +638,19 @@ export default function App() {
                     : 'bg-white/90 border-black/[0.06] focus-within:border-black/20 shadow-[0_12px_40px_rgba(0,0,0,0.05)]'
                 }`}
               >
-                {/* Plus Icon - Left */}
-                <button type="button" className={`ml-6 p-1 transition-colors ${theme === 'dark' ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600'}`}>
-                  <Plus size={22} strokeWidth={1.5} />
-                </button>
-
                 <input
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   placeholder="Ask anything"
                   disabled={!uploadedFile || isGenerating}
-                  className={`w-full bg-transparent border-none rounded-full py-6 pl-4 pr-32 text-base outline-none font-sans disabled:opacity-50 disabled:cursor-not-allowed ${
+                  className={`w-full bg-transparent border-none rounded-full py-6 pl-8 pr-16 text-base outline-none font-sans disabled:opacity-50 disabled:cursor-not-allowed ${
                     theme === 'dark' ? 'text-slate-200 placeholder:text-slate-600' : 'text-slate-800 placeholder:text-slate-400'
                   }`}
                 />
 
                 {/* Right Action Cluster */}
-                <div className="absolute right-3 flex items-center gap-3">
-                  <button type="button" className={`p-2 transition-colors ${theme === 'dark' ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600'}`}>
-                    <Mic size={20} strokeWidth={1.5} />
-                  </button>
-                  
+                <div className="absolute right-3 flex items-center">
                   <button
                     type="submit"
                     disabled={!input.trim() || !uploadedFile || isGenerating}
