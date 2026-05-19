@@ -4,6 +4,8 @@ An intelligent, full-stack Retrieval-Augmented Generation (RAG) web application 
 
 The system guarantees that the AI's answers are strictly grounded in the provided document, drastically reducing hallucinations and providing citations for its claims.
 
+**[Live Demo](https://aporia-ai-kappa.vercel.app/)**
+
 ## 🎯 Architecture Overview
 
 Aporia demonstrates a production-ready architectural split: a highly responsive client-side UI and a heavy data-processing backend pipeline.
