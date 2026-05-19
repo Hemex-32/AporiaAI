@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'framer-motion';
-import { UploadCloud, MessageSquare, Send, FileText, Loader2, Bot, User, Sparkles, Sun, Moon } from 'lucide-react';
+import { UploadCloud, MessageSquare, Send, FileText, Loader2, Bot, User, Sparkles, Sun, Moon, Plus, Mic, AudioLines } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 interface Message {
@@ -317,7 +317,7 @@ export default function App() {
         initial={{ x: -280, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-        className={`w-80 p-8 flex flex-col z-10 rounded-3xl h-full overflow-y-auto scrollbar-none transition-all duration-500 ${
+        className={`w-96 p-8 flex flex-col z-10 rounded-3xl h-full overflow-y-auto scrollbar-none transition-all duration-500 ${
           theme === 'dark' ? 'glass-panel-dark' : 'glass-panel-light'
         }`}
       >
@@ -327,18 +327,22 @@ export default function App() {
           
           <div className="flex items-center gap-4">
             {/* Elegant floating glass brand block */}
-            <div className={`
-              relative flex items-center justify-center w-14 h-14 rounded-2xl shrink-0 border transition-all duration-500 shadow-md
-              ${theme === 'dark'
-                ? 'bg-white/[0.02] border-white/10 text-brand-300 shadow-brand-500/[0.03]'
-                : 'bg-black/[0.01] border-black/10 text-brand-700 shadow-black/[0.01]'
-              }
-            `}>
+            <motion.div 
+              animate={{ y: [0, -4, 0] }}
+              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+              className={`
+                relative flex items-center justify-center w-14 h-14 rounded-2xl shrink-0 border transition-all duration-500 shadow-md
+                ${theme === 'dark'
+                  ? 'bg-white/[0.02] border-white/10 text-brand-300 shadow-brand-500/[0.03]'
+                  : 'bg-black/[0.01] border-black/10 text-brand-700 shadow-black/[0.01]'
+                }
+              `}
+            >
               <Sparkles size={24} className="relative z-10" />
               <div className={`absolute inset-0 rounded-2xl blur-lg opacity-40 transition-opacity ${
                 theme === 'dark' ? 'bg-brand-500/20' : 'bg-brand-500/10'
               }`} />
-            </div>
+            </motion.div>
             
             <div>
               <h1 className={`text-2xl font-black tracking-[0.12em] uppercase leading-none ${
@@ -385,7 +389,7 @@ export default function App() {
                   {isUploading ? <Loader2 className="animate-spin text-brand-500" size={20} /> : <UploadCloud size={20} />}
                 </div>
                 <div>
-                  <p className={`text-xs font-light tracking-wide ${theme === 'dark' ? 'text-slate-200' : 'text-slate-700'}`}>
+                  <p className={`text-sm font-light tracking-wide ${theme === 'dark' ? 'text-slate-200' : 'text-slate-700'}`}>
                     {isUploading ? 'Ingesting manuscript...' : 'Drop PDF here'}
                   </p>
                   <p className={`text-[9px] mt-1 tracking-wider ${theme === 'dark' ? 'text-slate-500' : 'text-slate-450'}`}>
@@ -428,7 +432,7 @@ export default function App() {
                   <FileText size={16} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className={`text-xs font-light truncate ${theme === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>{uploadedFile}</p>
+                  <p className={`text-sm font-light truncate ${theme === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>{uploadedFile}</p>
                   <p className="text-[8px] text-brand-500 font-medium mt-0.5 uppercase tracking-[0.18em]">Fully Grounded</p>
                 </div>
               </motion.div>
@@ -445,10 +449,17 @@ export default function App() {
       </motion.div>
 
       {/* Main Unified Console Panel */}
-      <div className="flex-1 flex flex-col relative z-10 h-full overflow-hidden">
+      <motion.div 
+        initial={{ y: 20, opacity: 0, rotateX: 2 }}
+        animate={{ y: 0, opacity: 1, rotateX: 0 }}
+        transition={{ duration: 1, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
+        className="flex-1 flex flex-col relative z-10 h-full overflow-hidden"
+      >
         <div className={`flex-1 flex flex-col rounded-3xl overflow-hidden transition-all duration-500 ${
           theme === 'dark' ? 'glass-panel-dark' : 'glass-panel-light'
-        }`}>
+        }`}
+        style={{ perspective: '1200px' }}
+        >
           
           {/* Panel Header */}
           <div className={`h-20 w-full flex items-center justify-between px-8 border-b ${
@@ -476,7 +487,7 @@ export default function App() {
 
           {/* Chat Messages */}
           <div className="flex-1 overflow-y-auto p-8 scroll-smooth">
-            <div className="max-w-2xl mx-auto flex flex-col gap-8 py-4">
+            <div className="max-w-5xl mx-auto flex flex-col gap-8 py-4">
               
               {messages.length === 0 && !uploadedFile && (
                 <motion.div 
@@ -493,7 +504,7 @@ export default function App() {
                   <h2 className={`text-xl font-light mb-2 tracking-[0.08em] uppercase ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                     Grounding Module Ready
                   </h2>
-                  <p className={`max-w-sm text-xs leading-relaxed font-light tracking-wide ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                  <p className={`max-w-sm text-sm leading-relaxed font-light tracking-wide ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
                     Upload a research manuscript. Aporia will isolate your context queries using semantic vector indexes.
                   </p>
                 </motion.div>
@@ -534,7 +545,7 @@ export default function App() {
                       }
                     `}>
                       {msg.role === 'user' ? (
-                        <p className={`whitespace-pre-wrap leading-relaxed text-xs tracking-wide font-light ${
+                        <p className={`whitespace-pre-wrap leading-relaxed text-sm tracking-wide font-light ${
                           theme === 'dark' ? 'text-slate-300' : 'text-slate-700'
                         }`}>{msg.content}</p>
                       ) : (
@@ -545,14 +556,14 @@ export default function App() {
                             components={{
                               p: ({node, ...props}) => <p className="mb-4 last:mb-0" {...props} />,
                               strong: ({node, ...props}) => <strong className={`${theme === 'dark' ? 'text-brand-300' : 'text-brand-700'} font-medium`} {...props} />,
-                              ul: ({node, ...props}) => <ul className={`list-disc pl-5 mb-4 space-y-1.5 text-xs tracking-wide font-light ${
+                              ul: ({node, ...props}) => <ul className={`list-disc pl-5 mb-4 space-y-1.5 text-sm tracking-wide font-light ${
                                 theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
                               }`} {...props} />,
-                              ol: ({node, ...props}) => <ol className={`list-decimal pl-5 mb-4 space-y-1.5 text-xs tracking-wide font-light ${
+                              ol: ({node, ...props}) => <ol className={`list-decimal pl-5 mb-4 space-y-1.5 text-sm tracking-wide font-light ${
                                 theme === 'dark' ? 'text-slate-400' : 'text-slate-500'
                               }`} {...props} />,
                               li: ({node, ...props}) => <li {...props} />,
-                              h1: ({node, ...props}) => <h1 className={`text-xs font-semibold mb-2 mt-4 first:mt-0 tracking-[0.1em] uppercase border-b pb-1.5 ${
+                              h1: ({node, ...props}) => <h1 className={`text-sm font-semibold mb-2 mt-4 first:mt-0 tracking-[0.1em] uppercase border-b pb-1.5 ${
                                 theme === 'dark' ? 'text-white border-white/[0.04]' : 'text-slate-900 border-black/[0.03]'
                               }`} {...props} />,
                               h2: ({node, ...props}) => <h2 className={`text-[11px] font-semibold mb-2 mt-3.5 first:mt-0 tracking-[0.08em] uppercase ${
@@ -618,37 +629,54 @@ export default function App() {
               ? 'border-white/[0.04] bg-dark-950/20' 
               : 'border-black/[0.03] bg-black/[0.005]'
           }`}>
-            <div className="max-w-2xl w-full mx-auto">
+            <div className="max-w-5xl w-full mx-auto">
               <form 
                 onSubmit={handleSendMessage}
-                className={`relative flex items-center group shadow-sm rounded-full border transition-all duration-300 ${
+                className={`relative flex items-center group shadow-lg rounded-full border transition-all duration-500 ${
                   theme === 'dark' 
-                    ? 'bg-dark-900/60 border-white/[0.05] focus-within:border-brand-500/30' 
-                    : 'bg-white/90 border-black/[0.04] focus-within:border-brand-500/30 shadow-[0_8px_30px_rgba(0,0,0,0.02)]'
+                    ? 'bg-[#1A1A1C]/90 border-white/[0.08] focus-within:border-white/20' 
+                    : 'bg-white/90 border-black/[0.06] focus-within:border-black/20 shadow-[0_12px_40px_rgba(0,0,0,0.05)]'
                 }`}
               >
+                {/* Plus Icon - Left */}
+                <button type="button" className={`ml-6 p-1 transition-colors ${theme === 'dark' ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600'}`}>
+                  <Plus size={22} strokeWidth={1.5} />
+                </button>
+
                 <input
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder={uploadedFile ? "Query context model..." : "Awaiting manuscript upload..."}
+                  placeholder="Ask anything"
                   disabled={!uploadedFile || isGenerating}
-                  className={`w-full bg-transparent border-none rounded-full py-4.5 pl-8 pr-16 text-xs outline-none font-sans disabled:opacity-50 disabled:cursor-not-allowed ${
-                    theme === 'dark' ? 'text-slate-200 placeholder:text-slate-650' : 'text-slate-800 placeholder:text-slate-400'
+                  className={`w-full bg-transparent border-none rounded-full py-6 pl-4 pr-32 text-base outline-none font-sans disabled:opacity-50 disabled:cursor-not-allowed ${
+                    theme === 'dark' ? 'text-slate-200 placeholder:text-slate-600' : 'text-slate-800 placeholder:text-slate-400'
                   }`}
                 />
-                <button
-                  type="submit"
-                  disabled={!input.trim() || !uploadedFile || isGenerating}
-                  className="absolute right-3 p-3 bg-brand-500 hover:bg-brand-400 text-dark-950 rounded-full disabled:opacity-0 disabled:scale-95 transition-all shadow-md shadow-brand-500/10 hover:shadow-brand-500/20"
-                >
-                  <Send size={12} className="relative left-[0.5px] top-[-0.5px]" />
-                </button>
+
+                {/* Right Action Cluster */}
+                <div className="absolute right-3 flex items-center gap-3">
+                  <button type="button" className={`p-2 transition-colors ${theme === 'dark' ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600'}`}>
+                    <Mic size={20} strokeWidth={1.5} />
+                  </button>
+                  
+                  <button
+                    type="submit"
+                    disabled={!input.trim() || !uploadedFile || isGenerating}
+                    className={`p-3.5 rounded-full transition-all shadow-lg ${
+                      theme === 'dark'
+                        ? 'bg-white text-dark-950 hover:bg-slate-200'
+                        : 'bg-dark-950 text-white hover:bg-slate-800'
+                    } disabled:opacity-30 disabled:scale-95`}
+                  >
+                    <AudioLines size={18} strokeWidth={2.5} />
+                  </button>
+                </div>
               </form>
-              <div className={`text-center mt-3 text-[8px] font-medium tracking-[0.2em] uppercase ${
-                theme === 'dark' ? 'text-slate-600' : 'text-slate-450'
+              <div className={`text-center mt-4 text-[9px] font-medium tracking-[0.25em] uppercase opacity-40 ${
+                theme === 'dark' ? 'text-slate-500' : 'text-slate-450'
               }`}>
-                Grounded vector model active // Data mathematically verified from document source
+                Neural Grounding Matrix // V 1.0.0
               </div>
             </div>
           </div>
