@@ -103,6 +103,7 @@ export default function App() {
   const [isUploading, setIsUploading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<string | null>(null);
+  const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [warmupSecondsRemaining, setWarmupSecondsRemaining] = useState<number | null>(null);
@@ -134,6 +135,7 @@ export default function App() {
     
     setIsUploading(true);
     setUploadError(null);
+    setSuggestedQuestions([]);
     setWarmupSecondsRemaining(null);
     setUploadStatus('Checking backend readiness...');
     const formData = new FormData();
@@ -172,6 +174,7 @@ export default function App() {
 
       const uploadResult = await response.json();
       setUploadedFile(uploadResult.document_id || file.name);
+      setSuggestedQuestions(uploadResult.suggested_questions || []);
       
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
@@ -584,7 +587,7 @@ export default function App() {
                           theme === 'dark' ? 'border-white/[0.03] text-slate-500' : 'border-black/[0.03] text-slate-450'
                         }`}>
                           <FileText size={10} className="text-brand-400" />
-                          <span>Source: <span className={theme === 'dark' ? 'text-slate-400 font-light' : 'text-slate-600 font-light'}>{msg.sources.source}</span> <span className="opacity-40">//</span> Segment {msg.sources.chunk_index}</span>
+                          <span>Source: <span className={theme === 'dark' ? 'text-slate-400 font-light' : 'text-slate-600 font-light'}>{msg.sources.source}</span> <span className="opacity-40">//</span> Page {msg.sources.page_number}</span>
                         </div>
                       )}
                     </div>
@@ -630,6 +633,35 @@ export default function App() {
               : 'border-black/[0.03] bg-black/[0.005]'
           }`}>
             <div className="max-w-5xl w-full mx-auto">
+              {/* Suggested Questions Chips */}
+              <AnimatePresence>
+                {suggestedQuestions.length > 0 && !isGenerating && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="flex flex-wrap gap-2 mb-6"
+                  >
+                    {suggestedQuestions.map((question, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          setInput(question);
+                          setSuggestedQuestions([]);
+                        }}
+                        className={`px-4 py-2 rounded-full text-[10px] font-medium tracking-wide border transition-all duration-300 ${
+                          theme === 'dark'
+                            ? 'bg-white/[0.02] border-white/10 text-slate-400 hover:border-brand-500/40 hover:text-brand-300 hover:bg-brand-500/5'
+                            : 'bg-black/[0.01] border-black/10 text-slate-600 hover:border-brand-500/40 hover:text-brand-700 hover:bg-brand-500/5'
+                        }`}
+                      >
+                        {question}
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <form 
                 onSubmit={handleSendMessage}
                 className={`relative flex items-center group shadow-lg rounded-full border transition-all duration-500 ${

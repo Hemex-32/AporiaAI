@@ -116,43 +116,56 @@ async def ensure_resources_ready(wait_for_ready: bool = False, timeout_seconds: 
 
 def process_pdf_sync(file: UploadFile):
     pdf_reader = PdfReader(file.file)
-    text = ""
-
-    for page in pdf_reader.pages:
+    chunks_data = []
+    
+    for i, page in enumerate(pdf_reader.pages):
         extracted = page.extract_text()
         if extracted:
-            text += extracted + "\n"
+            text_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=1000,
+                chunk_overlap=200,
+                length_function=len,
+            )
+            page_chunks = text_splitter.split_text(extracted)
+            for chunk in page_chunks:
+                chunks_data.append({
+                    "text": chunk,
+                    "metadata": {
+                        "source": file.filename,
+                        "document_id": file.filename,
+                        "page_number": i + 1
+                    }
+                })
 
-    if not text.strip():
+    if not chunks_data:
         raise HTTPException(
             status_code=400,
             detail="Could not extract any text from the PDF.",
         )
 
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=200,
-        length_function=len,
-    )
-    chunks = text_splitter.split_text(text)
-
     document_id = f"{file.filename}-{uuid.uuid4().hex}"
-    ids = [f"{document_id}_chunk_{i}" for i in range(len(chunks))]
-    metadatas = [
-        {"source": file.filename, "document_id": document_id, "chunk_index": i}
-        for i in range(len(chunks))
-    ]
+    ids = [f"{document_id}_chunk_{i}" for i in range(len(chunks_data))]
+    documents = [c["text"] for c in chunks_data]
+    metadatas = [c["metadata"] for c in chunks_data]
 
     collection.add(
-        documents=chunks,
+        documents=documents,
         metadatas=metadatas,
         ids=ids,
     )
 
+    # Simple suggested questions
+    suggested_questions = [
+        f"What are the main findings of {file.filename}?",
+        "Can you summarize the methodology used in this research?",
+        "What are the key conclusions reached by the authors?"
+    ]
+
     return {
         "status": "success",
         "document_id": file.filename,
-        "message": f"Successfully processed and stored {len(chunks)} chunks from {file.filename}.",
+        "message": f"Successfully processed and stored {len(chunks_data)} chunks from {file.filename}.",
+        "suggested_questions": suggested_questions
     }
 
 
