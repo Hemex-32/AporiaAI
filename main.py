@@ -115,10 +115,12 @@ async def ensure_resources_ready(wait_for_ready: bool = False, timeout_seconds: 
 
 
 def process_pdf_sync(file: UploadFile):
+    print(f"Processing PDF: {file.filename}")
     pdf_reader = PdfReader(file.file)
     chunks_data = []
     
     for i, page in enumerate(pdf_reader.pages):
+        print(f"Extracting text from page {i+1}...")
         extracted = page.extract_text()
         if extracted:
             text_splitter = RecursiveCharacterTextSplitter(
@@ -131,12 +133,13 @@ def process_pdf_sync(file: UploadFile):
                 chunks_data.append({
                     "text": chunk,
                     "metadata": {
-                        "source": file.filename,
-                        "document_id": file.filename,
+                        "source": file.filename or "unknown",
+                        "document_id": file.filename or "unknown",
                         "page_number": i + 1
                     }
                 })
 
+    print(f"Extracted {len(chunks_data)} chunks.")
     if not chunks_data:
         raise HTTPException(
             status_code=400,
@@ -148,11 +151,13 @@ def process_pdf_sync(file: UploadFile):
     documents = [c["text"] for c in chunks_data]
     metadatas = [c["metadata"] for c in chunks_data]
 
+    print(f"Adding to ChromaDB...")
     collection.add(
         documents=documents,
         metadatas=metadatas,
         ids=ids,
     )
+    print(f"Done.")
 
     # Simple suggested questions
     suggested_questions = [

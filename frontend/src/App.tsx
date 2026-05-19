@@ -41,7 +41,7 @@ const getResponseErrorMessage = async (response: Response) => {
   return response.statusText || `Request failed with status ${response.status}`;
 };
 
-const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeoutMs = 30000) => {
+const fetchWithTimeout = async (url: string, options: RequestInit = {}, timeoutMs = 60000) => {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
 
@@ -145,7 +145,7 @@ export default function App() {
       const configError = getApiConfigError(API_BASE_URL);
       if (configError) throw new Error(configError);
 
-      const healthResponse = await fetchWithTimeout(`${API_BASE_URL}/health`, {}, 15000);
+      const healthResponse = await fetchWithTimeout(`${API_BASE_URL}/health`, {}, 60000);
       if (!healthResponse.ok) {
         throw new Error(await getResponseErrorMessage(healthResponse));
       }
