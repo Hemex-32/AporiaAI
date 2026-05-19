@@ -2,6 +2,7 @@ import asyncio
 from contextlib import asynccontextmanager
 import json
 import os
+import re
 import time
 import uuid
 from typing import List, Optional
@@ -25,6 +26,7 @@ resources_error = None
 resources_started_at = time.time()
 resources_ready_at = None
 warmup_estimate_seconds = 15
+chat_model = os.getenv("GEMINI_CHAT_MODEL", "gemini-2.0-flash")
 
 
 class GeminiEmbeddingFunction:
@@ -154,6 +156,23 @@ def process_pdf_sync(file: UploadFile):
     }
 
 
+def format_gemini_error(error: Exception):
+    message = str(error)
+    if "RESOURCE_EXHAUSTED" not in message and "429" not in message:
+        return message
+
+    retry_match = re.search(r"retry in ([0-9.]+)s", message, re.IGNORECASE)
+    retry_hint = ""
+    if retry_match:
+        retry_seconds = round(float(retry_match.group(1)))
+        retry_hint = f" Google suggests retrying in about {retry_seconds} seconds."
+
+    return (
+        f"Gemini quota was exhausted for {chat_model}."
+        f"{retry_hint} If this keeps happening, enable billing or use a Gemini API key/project with available quota."
+    )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -216,6 +235,7 @@ async def health_check():
         "warmup_estimate_seconds": warmup_estimate_seconds,
         "warmup_remaining_seconds": remaining_seconds,
         "resources_ready_at": resources_ready_at,
+        "chat_model": chat_model,
     }
 
 
@@ -294,7 +314,7 @@ Question: {payload.query}
                 yield f"data: {json.dumps({'type': 'sources', 'sources': primary_source})}\n\n"
 
                 response = gemini_client.models.generate_content_stream(
-                    model="gemini-2.0-flash",
+                    model=chat_model,
                     contents=prompt,
                 )
                 for chunk in response:
@@ -303,7 +323,7 @@ Question: {payload.query}
 
                 yield "data: [DONE]\n\n"
             except Exception as e:
-                yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+                yield f"data: {json.dumps({'type': 'error', 'message': format_gemini_error(e)})}\n\n"
                 yield "data: [DONE]\n\n"
 
         return StreamingResponse(event_generator(), media_type="text/event-stream")
