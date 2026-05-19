@@ -1,6 +1,6 @@
-import { useState, useCallback, useRef, useEffect, ReactNode } from 'react';
+import { useState, useCallback, useRef, useEffect, type ReactNode } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { motion, AnimatePresence, useSpring, useMotionValue, useTransform } from 'framer-motion';
+import { motion, AnimatePresence, useSpring, useMotionValue } from 'framer-motion';
 import { UploadCloud, MessageSquare, FileText, Loader2, Bot, User, Sparkles, Sun, Moon, AudioLines } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
